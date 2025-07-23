@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Generador de Imágenes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-black text-white p-4 font-sans">
+
+  <h1 class="text-3xl text-purple-500 font-bold mb-4">Generador de Imágenes TMDB</h1>
+
+  <div class="flex flex-col sm:flex-row gap-4 mb-4">
+    <input id="searchInput" type="text" placeholder="Buscar título..." class="p-2 rounded w-full text-black"/>
+    <select id="categorySelect" class="p-2 rounded text-black">
+      <option value="anime">Anime</option>
+      <option value="peliculas">Películas</option>
+      <option value="series">Series</option>
+      <option value="accion">Acción</option>
+      <option value="drama">Drama</option>
+      <option value="romance">Romance</option>
+      <option value="terror">Terror</option>
+      <option value="aventura">Aventura</option>
+      <option value="comedia">Comedia</option>
+      <option value="ciencia-ficcion">Ciencia ficción</option>
+      <option value="fantasia">Fantasía</option>
+      <option value="misterio">Misterio</option>
+      <option value="documental">Documental</option>
+      <option value="animacion">Animación</option>
+      <option value="crimen">Crimen</option>
+      <option value="familia">Familia</option>
+    </select>
+    <button id="searchBtn" class="bg-purple-600 px-4 py-2 rounded hover:bg-purple-700">Buscar</button>
+    <button id="openDeleteModal" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700">Eliminar Imágenes</button>
+  </div>
+
+  <div id="results" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4"></div>
+
+  <!-- Modal eliminar -->
+  <div id="deleteModal" class="hidden fixed top-0 left-0 w-full h-full bg-black bg-opacity-80 z-50 overflow-auto p-4">
+    <div class="bg-gray-900 rounded p-4 max-w-5xl mx-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-purple-400">Eliminar Imágenes</h2>
+        <button id="closeDeleteModal" class="text-white text-xl">&times;</button>
+      </div>
+      <div id="deleteImagesContainer" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4 max-h-[80vh] overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getDatabase, ref, push, get, remove } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0HjLxZYUuIvpeiLJaOIXa5LvuD0qFcQw",
+      authDomain: "cartelera-anime.firebaseapp.com",
+      databaseURL: "https://cartelera-anime-default-rtdb.firebaseio.com",
+      projectId: "cartelera-anime",
+      storageBucket: "cartelera-anime.appspot.com",
+      messagingSenderId: "262760991803",
+      appId: "1:262760991803:web:210cb0618a35e988c2a01e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const TMDB_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4NGNjNmMyMDQ4OTI2NDRhYWJiM2YwYzIwZGMzMzNlZCIsIm5iZiI6MTc1MjY1MzE2My4xMDksInN1YiI6IjY4Nzc1ZDZiYzUwMGQzOWZkZmNjZTFmYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Sm2wMquho_Ff_nROFOlhYPBWncC7sfOElRLfT-D3oZM";
+
+    const searchBtn = document.getElementById("searchBtn");
+    const searchInput = document.getElementById("searchInput");
+    const resultsDiv = document.getElementById("results");
+    const categorySelect = document.getElementById("categorySelect");
+
+    searchBtn.addEventListener("click", async () => {
+      const query = searchInput.value.trim();
+      if (!query) return;
+
+      resultsDiv.innerHTML = "<p class='text-purple-400'>Buscando...</p>";
+
+      const response = await fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=es-ES&page=1`, {
+        headers: {
+          Authorization: `Bearer ${TMDB_TOKEN}`
+        }
+      });
+
+      const data = await response.json();
+      resultsDiv.innerHTML = "";
+
+      if (!data.results || data.results.length === 0) {
+        resultsDiv.innerHTML = "<p class='text-red-500'>No se encontraron resultados.</p>";
+        return;
+      }
+
+      data.results.forEach(item => {
+        if (item.poster_path) {
+          const imgURL = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+          const img = document.createElement("img");
+          img.src = imgURL;
+          img.className = "rounded cursor-pointer hover:scale-105 transition-transform";
+          img.title = item.title || item.name;
+
+          img.addEventListener("click", () => {
+            const selectedCategory = categorySelect.value;
+            const newRef = ref(db, `cartelera/${selectedCategory}`);
+            push(newRef, { url: imgURL });
+            alert("Imagen guardada en categoría: " + selectedCategory);
+          });
+
+          resultsDiv.appendChild(img);
+        }
+      });
+    });
+
+    // Modal eliminar
+    const deleteModal = document.getElementById("deleteModal");
+    const openDeleteModal = document.getElementById("openDeleteModal");
+    const closeDeleteModal = document.getElementById("closeDeleteModal");
+    const deleteImagesContainer = document.getElementById("deleteImagesContainer");
+
+    openDeleteModal.addEventListener("click", async () => {
+      deleteImagesContainer.innerHTML = "";
+      deleteModal.classList.remove("hidden");
+
+      const categories = [
+        "anime","peliculas","series","accion","drama","romance","terror","aventura",
+        "comedia","ciencia-ficcion","fantasia","misterio","documental","animacion","crimen","familia"
+      ];
+
+      for (let category of categories) {
+        const catRef = ref(db, `cartelera/${category}`);
+        const snapshot = await get(catRef);
+
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+
+          for (let id in data) {
+            const item = data[id];
+            const wrapper = document.createElement("div");
+            wrapper.className = "relative group";
+
+            const img = document.createElement("img");
+            img.src = item.url;
+            img.className = "rounded";
+
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "Eliminar";
+            delBtn.className = "absolute top-1 right-1 bg-red-600 px-2 py-1 text-xs rounded hidden group-hover:block";
+            delBtn.addEventListener("click", () => {
+              remove(ref(db, `cartelera/${category}/${id}`));
+              wrapper.remove();
+            });
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(delBtn);
+            deleteImagesContainer.appendChild(wrapper);
+          }
+        }
+      }
+    });
+
+    closeDeleteModal.addEventListener("click", () => {
+      deleteModal.classList.add("hidden");
+    });
+
+  </script>
+</body>
+</html>
