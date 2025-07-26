@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cartelera Anime</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <h1 class="text-3xl text-purple-500 font-bold text-center mb-8">PRÓXIMAMENTE</h1>
+
+    <div id="contenedor-categorias" class="space-y-10"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0HjLxZYUuIvpeiLJaOIXa5LvuD0qFcQw",
+      authDomain: "cartelera-anime.firebaseapp.com",
+      databaseURL: "https://cartelera-anime-default-rtdb.firebaseio.com",
+      projectId: "cartelera-anime",
+      storageBucket: "cartelera-anime.appspot.com",
+      messagingSenderId: "262760991803",
+      appId: "1:262760991803:web:210cb0618a35e988c2a01e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, 'cartelera');
+
+    let todasLasImagenes = [];
+
+    function crearSeccionCategoria(titulo, imagenes) {
+      const seccion = document.createElement('div');
+      seccion.innerHTML = `
+        <h2 class="text-xl mb-4 text-purple-400 capitalize">${titulo.replaceAll('-', ' ')}</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          ${imagenes.map(img => `
+            <div class="relative">
+              <div class="absolute top-1 left-1 bg-black bg-opacity-70 text-red-500 text-xs font-bold px-2 py-1 rounded">PRÓXIMAMENTE</div>
+              <img src="${img.url}" alt="imagen" class="w-full h-48 object-cover rounded"/>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      return seccion;
+    }
+
+    function mostrarCategorias(filtradas) {
+      const contenedor = document.getElementById('contenedor-categorias');
+      contenedor.innerHTML = '';
+
+      const categoriasAgrupadas = {};
+
+      filtradas.forEach(item => {
+        if (!categoriasAgrupadas[item.categoria]) categoriasAgrupadas[item.categoria] = [];
+        categoriasAgrupadas[item.categoria].push(item);
+      });
+
+      for (const cat in categoriasAgrupadas) {
+        const seccion = crearSeccionCategoria(cat, categoriasAgrupadas[cat]);
+        contenedor.appendChild(seccion);
+      }
+    }
+
+    get(dbRef).then(snapshot => {
+      if (!snapshot.exists()) return;
+
+      const datos = snapshot.val();
+      todasLasImagenes = [];
+
+      for (const categoria in datos) {
+        for (const key in datos[categoria]) {
+          todasLasImagenes.push({
+            categoria,
+            url: datos[categoria][key].url
+          });
+        }
+      }
+
+      mostrarCategorias(todasLasImagenes);
+    });
+  </script>
+</body>
+</html>
